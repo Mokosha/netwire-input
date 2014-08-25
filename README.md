@@ -1,4 +1,4 @@
-netwire-glfw
+netwire-input
 ============
 
-A library of wires that provide keyboard, mouse, and joystick input using GLFW.
+A library of wires that provide keyboard, mouse, and joystick input.
