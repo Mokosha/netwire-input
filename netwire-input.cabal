@@ -17,9 +17,13 @@ build-type:          Simple
 cabal-version:       >=1.10
 
 library
-  -- exposed-modules:     
-  -- other-modules:       
-  -- other-extensions:    
-  build-depends:       base >=4.7 && <4.8
-  hs-source-dirs:      src
+  default-extensions:
+        FunctionalDependencies
+        MultiParamTypeClasses
+  exposed-modules:     FRP.Netwire.Input
+  -- other-modules:    
+  -- other-extensions: 
+  build-depends:       base >=4.7 && <4.8,
+                       netwire >= 5
+  hs-source-dirs:      lib
   default-language:    Haskell2010
