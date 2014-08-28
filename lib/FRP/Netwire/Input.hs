@@ -1,5 +1,6 @@
 module FRP.Netwire.Input (
   Key, MouseButton,
+  CursorMode(..),
   MonadInput(..),
 ) where
 
@@ -11,12 +12,18 @@ import Data.Monoid
 class Key a
 class MouseButton a
 
+data CursorMode = CursorMode'Disabled
+                | CursorMode'Hidden
+                | CursorMode'Enabled
+                deriving (Ord, Enum, Eq, Show, Read)
+
 class (Key k, MouseButton mb, Monad m) => MonadInput k mb m | m -> k, m -> mb where
   keyIsPressed :: k -> m (Bool)
   releaseKey :: k -> m ()
   mbIsPressed :: mb -> m (Bool)
   releaseButton :: mb -> m ()
   cursor :: m (Float, Float)
+  setCursorMode :: CursorMode -> m ()
   scroll :: m (Double, Double)
 
 --------------------------------------------------------------------------------
