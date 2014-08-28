@@ -2,10 +2,12 @@ module FRP.Netwire.Input (
   Key, MouseButton,
   CursorMode(..),
   MonadInput(..),
+  keyPressed, keyDebounced,
+  mousePressed, mouseDebounced, mouseCursor, mouseCursorHidden, mouseMickies
 ) where
 
 --------------------------------------------------------------------------------
-import Control.Wire
+import Control.Wire hiding ((.))
 import Data.Monoid
 --------------------------------------------------------------------------------
 
@@ -56,3 +58,16 @@ mouseDebounced mouse = mkGen_ $ \x -> do
   if pressed
     then releaseButton mouse >> return (Right x)
     else return (Left mempty)
+
+mouseCursor :: MonadInput k mb m => Wire s e m a (Float, Float)
+mouseCursor = mkGen_ $ \_ -> cursor >>= (return . Right)
+
+mouseCursorHidden :: (MonadInput k mb m) => Wire s e m a (Float, Float)
+mouseCursorHidden = mkGen_ $ \_ -> do
+  setCursorMode CursorMode'Hidden
+  cursor >>= (return . Right)
+
+mouseMickies :: (MonadInput k mb m) => Wire s e m a (Float, Float)
+mouseMickies = mkGen_ $ \_ -> do
+  setCursorMode CursorMode'Disabled
+  cursor >>= (return . Right)
