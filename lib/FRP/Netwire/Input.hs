@@ -1,8 +1,9 @@
 module FRP.Netwire.Input (
   Key, MouseButton,
   CursorMode(..),
-  MonadInput(..),
+  MonadKeyboard(..),
   keyPressed, keyDebounced,
+  MonadMouse(..),
   mousePressed, mouseDebounced, mouseCursor, mouseCursorHidden, mouseMickies
 ) where
 
@@ -11,7 +12,9 @@ import Control.Wire hiding ((.))
 import Data.Monoid
 --------------------------------------------------------------------------------
 
-class Key a
+--------------------------------------------------------------------------------
+-- Mouse input
+
 class MouseButton a
 
 data CursorMode = CursorMode'Disabled
@@ -19,55 +22,58 @@ data CursorMode = CursorMode'Disabled
                 | CursorMode'Enabled
                 deriving (Ord, Enum, Eq, Show, Read)
 
-class (Key k, MouseButton mb, Monad m) => MonadInput k mb m | m -> k, m -> mb where
-  keyIsPressed :: k -> m (Bool)
-  releaseKey :: k -> m ()
+class (MouseButton mb, Monad m) => MonadMouse mb m | m -> mb where
+  setCursorMode :: CursorMode -> m ()
   mbIsPressed :: mb -> m (Bool)
   releaseButton :: mb -> m ()
   cursor :: m (Float, Float)
-  setCursorMode :: CursorMode -> m ()
   scroll :: m (Double, Double)
 
---------------------------------------------------------------------------------
--- Wires
+mouseCursor :: MonadMouse mb m => Wire s e m a (Float, Float)
+mouseCursor = mkGen_ $ \_ -> cursor >>= (return . Right)
 
-keyPressed :: (Monoid e, MonadInput k mb m) => k -> Wire s e m a a
-keyPressed key = mkGen_ $ \x -> do
-  pressed <- keyIsPressed key
-  if pressed
-    then return (Right x)
-    else return (Left mempty)
+mouseCursorHidden :: MonadMouse mb m => Wire s e m a (Float, Float)
+mouseCursorHidden = mkGen_ $ \_ -> do
+  setCursorMode CursorMode'Hidden
+  cursor >>= (return . Right)
 
-keyDebounced :: (Monoid e, MonadInput k mb m) => k -> Wire s e m a a
-keyDebounced key = mkGen_ $ \x -> do
-  pressed <- keyIsPressed key
-  if pressed
-    then releaseKey key >> return (Right x)
-    else return (Left mempty)
+mouseMickies :: MonadMouse mb m => Wire s e m a (Float, Float)
+mouseMickies = mkGen_ $ \_ -> do
+  setCursorMode CursorMode'Disabled
+  cursor >>= (return . Right)
 
-mousePressed :: (Monoid e, MonadInput k mb m) => mb -> Wire s e m a a
+mousePressed :: (Monoid e, MonadMouse mb m) => mb -> Wire s e m a a
 mousePressed mouse = mkGen_ $ \x -> do
   pressed <- mbIsPressed mouse
   if pressed
     then return (Right x)
     else return (Left mempty)
 
-mouseDebounced :: (Monoid e, MonadInput k mb m) => mb -> Wire s e m a a
+mouseDebounced :: (Monoid e, MonadMouse mb m) => mb -> Wire s e m a a
 mouseDebounced mouse = mkGen_ $ \x -> do
   pressed <- mbIsPressed mouse
   if pressed
     then releaseButton mouse >> return (Right x)
     else return (Left mempty)
 
-mouseCursor :: MonadInput k mb m => Wire s e m a (Float, Float)
-mouseCursor = mkGen_ $ \_ -> cursor >>= (return . Right)
+--------------------------------------------------------------------------------
+-- Keyboard input
 
-mouseCursorHidden :: (MonadInput k mb m) => Wire s e m a (Float, Float)
-mouseCursorHidden = mkGen_ $ \_ -> do
-  setCursorMode CursorMode'Hidden
-  cursor >>= (return . Right)
+class Key a
+class (Key k, Monad m) => MonadKeyboard k m | m -> k where
+  keyIsPressed :: k -> m (Bool)
+  releaseKey :: k -> m ()
 
-mouseMickies :: (MonadInput k mb m) => Wire s e m a (Float, Float)
-mouseMickies = mkGen_ $ \_ -> do
-  setCursorMode CursorMode'Disabled
-  cursor >>= (return . Right)
+keyPressed :: (Monoid e, MonadKeyboard k m) => k -> Wire s e m a a
+keyPressed key = mkGen_ $ \x -> do
+  pressed <- keyIsPressed key
+  if pressed
+    then return (Right x)
+    else return (Left mempty)
+
+keyDebounced :: (Monoid e, MonadKeyboard k m) => k -> Wire s e m a a
+keyDebounced key = mkGen_ $ \x -> do
+  pressed <- keyIsPressed key
+  if pressed
+    then releaseKey key >> return (Right x)
+    else return (Left mempty)
