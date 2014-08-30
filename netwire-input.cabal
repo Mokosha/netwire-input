@@ -3,7 +3,7 @@
 
 name:                netwire-input
 version:             0.1.0.0
-synopsis:            An interface between netwire and GLFW for handling user input
+synopsis:            Input handling abstractions for netwire
 -- description:         
 homepage:            https://www.github.com/Mokosha/netwire-input
 license:             MIT
@@ -14,12 +14,11 @@ maintainer:          Krajcevski@gmail.com
 category:            Game
 build-type:          Simple
 -- extra-source-files:  
-cabal-version:       >=1.10
+cabal-version:       >= 1.10
 
 library
-  default-extensions:
-        FunctionalDependencies
-        MultiParamTypeClasses
+  default-extensions:  FunctionalDependencies
+                       MultiParamTypeClasses
   exposed-modules:     FRP.Netwire.Input
   -- other-modules:    
   -- other-extensions: 
