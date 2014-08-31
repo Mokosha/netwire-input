@@ -21,6 +21,10 @@ build-type:          Simple
 extra-source-files:  README.md
 cabal-version:       >= 1.10
 
+source-repository head
+  type:           git
+  location:       git@github.com:Mokosha/netwire-input.git
+
 library
   default-extensions:  FunctionalDependencies
                        MultiParamTypeClasses
