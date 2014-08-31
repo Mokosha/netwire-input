@@ -119,7 +119,6 @@ mouseDebounced mouse = mkGen_ $ \x -> do
 --   cursorMode CursorMode'Disabled --> mkId
 -- @
 -- 
--- * Depends: now
 -- * Inhibits: after now
 cursorMode :: (MonadMouse mb m, Monoid e) => CursorMode -> Wire s e m a a
 cursorMode mode =
@@ -155,7 +154,6 @@ keyPressed key = mkGen_ $ \x -> do
 -- | Behaves like the identity wire for a signle instant when the key
 -- is pressed and otherwise inhibits
 -- 
--- * Depends: the instant at which the key is pressed
 -- * Inhibits: when the key is not pressed or after it has been pressed
 keyDebounced :: (Monoid e, MonadKeyboard k m) => k -> Wire s e m a a
 keyDebounced key = mkGen_ $ \x -> do
