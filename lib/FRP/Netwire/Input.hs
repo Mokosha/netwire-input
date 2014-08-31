@@ -35,10 +35,9 @@ class MouseButton a
 -- the mouse is in the bounds of the application window.
 data CursorMode = CursorMode'Disabled -- ^ The mouse cursor is disabled
                 | CursorMode'Reset    -- ^ Reset the cursor to zero between computations
-                  -- | The mouse cursor is hidden when over the application
-                | CursorMode'Hidden
-                  -- | The mouse cursor is enabed and visible over the application
-                | CursorMode'Enabled
+                | CursorMode'Hidden   -- ^ The mouse cursor is hidden when over the application
+                | CursorMode'Enabled  -- ^ The mouse cursor is enabed and
+                                      -- visible over the application
                 deriving (Ord, Enum, Eq, Show, Read)
 
 -- ** Mouse input
@@ -139,6 +138,8 @@ class (Key k, Monad m) => MonadKeyboard k m | m -> k where
   keyIsPressed :: k -> m (Bool)
   -- | Resets the pressed state of the given key.
   releaseKey :: k -> m ()
+
+-- * Keyboard input wires
 
 -- | Behaves like the identity wire when the key is pressed
 -- and inhibits otherwise
