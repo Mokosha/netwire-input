@@ -151,6 +151,17 @@ keyPressed key = mkGen_ $ \x -> do
     then return (Right x)
     else return (Left mempty)
 
+-- | Behaves like the identity wire when the key is not pressed
+-- and inhibits otherwise
+-- 
+-- * Inhibits: when the key is pressed
+keyNotPressed :: (Monoid e, MonadKeyboard k m) => k -> Wire s e m a a
+keyNotPressed key = mkGen_ $ \x -> do
+  pressed <- keyIsPressed key
+  if pressed
+    then return (Left mempty)
+    else return (Right x)
+
 -- | Behaves like the identity wire for a signle instant when the key
 -- is pressed and otherwise inhibits
 -- 
