@@ -29,7 +29,7 @@ library
   default-extensions:  FunctionalDependencies
                        MultiParamTypeClasses
   exposed-modules:     FRP.Netwire.Input
-  build-depends:       base >=4.7 && <4.8,
+  build-depends:       base >=4.6 && <4.8,
                        netwire >= 5
   hs-source-dirs:      lib
   default-language:    Haskell2010
