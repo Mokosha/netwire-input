@@ -19,6 +19,7 @@ module FRP.Netwire.Input where
 
 --------------------------------------------------------------------------------
 -- Requried modules
+import Control.Monad (liftM)
 import Control.Monad.Fix
 import Control.Wire hiding ((.))
 import Data.Monoid
@@ -65,7 +66,7 @@ class (MouseButton mb, Monad m) => MonadMouse mb m | m -> mb where
 -- * Depends: now
 -- * Inhibits: never
 mouseCursor :: MonadMouse mb m => Wire s e m a (Float, Float)
-mouseCursor = mkGen_ $ \_ -> cursor >>= (return . Right)
+mouseCursor = mkGen_ $ \_ -> liftM Right cursor
 
 -- | Returns the change in mouse coordinates between subsequent time instants
 -- 
@@ -77,7 +78,7 @@ mouseDelta = let
   in
    (mouseCursor >>>) $ loop $ second (delay (0, 0)) >>>
    (arr $ \(cur, last) -> (delta cur last, cur))
-     
+
 -- | The mouse mickies are the offset from zero at each time instant. If this
 -- wire is being used, then it is assuming that the cursor mode is set to
 -- 'CursorMode'Reset'
@@ -111,6 +112,24 @@ mouseDebounced mouse = mkGen_ $ \x -> do
   if pressed
     then releaseButton mouse >> return (Right x)
     else return (Left mempty)
+
+-- | The mouse scroll is the offset from zero at each time instant.
+-- 
+-- * Depends: now
+-- * Inhibits: never
+mouseScroll :: (Monoid e, MonadMouse mb m) => Wire s e m a (Double, Double)
+mouseScroll = mkGen_ $ \_ -> liftM Right scroll
+
+-- | The amount that the mouse has scrolled over the course of the entire wire.
+-- 
+-- * Depends: now
+-- * Inhibits: never
+mouseScrolled :: (Monoid e, MonadMouse mb m) => Wire s e m a (Double, Double)
+mouseScrolled = mouseScroll >>> fn (0, 0)
+  where
+    fn (x, y) = mkSFN $ \(dx, dy) ->
+      let result = (x + dx, y + dy)
+      in (result, fn result)
 
 -- | Behaves like the identity wire, and inhibits immediately after
 -- setting the cursor mode. Common uses of this wire are to switch it
