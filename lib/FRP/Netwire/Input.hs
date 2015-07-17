@@ -15,15 +15,32 @@ as dependencies, these instances are provided in separate libraries.
 
 -}
 
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE UndecidableInstances #-}
+
 module FRP.Netwire.Input where
 
 --------------------------------------------------------------------------------
 -- Requried modules
-import Control.Monad (liftM)
+import Prelude hiding (id, (.))
 import Control.Monad.Fix
-import Control.Wire hiding ((.))
-import Data.Monoid
+import Control.Monad.State
+import Control.Monad.Writer
+import Control.Monad.Reader
+import Control.Monad.Except
+import Control.Monad.Trans.Maybe
+import Control.Monad.List
+import Control.Monad.Trans.Identity
+import Control.Monad.Cont
+import Control.Wire
 --------------------------------------------------------------------------------
+
+-- | Turns a wire that outputs arbitrary events into one which puts the input
+-- into the events, when they occur.
+idifyEvent :: Monad m => Wire s e m a (Event b) -> Wire s e m a (Event a)
+idifyEvent w = arr duplicate >>> first w >>> arr mkEvent
+  where mkEvent (e, x) = fmap (const x) e
+        duplicate x = (x,x)
 
 --------------------------------------------------------------------------------
 -- * Mouse input
@@ -43,13 +60,13 @@ data CursorMode = CursorMode'Disabled -- ^ The mouse cursor is disabled
 
 -- ** Mouse input
 
--- | This monad describes computations that involve mouse input. 
+-- | This monad describes computations that involve mouse input.
 class (MouseButton mb, Monad m) => MonadMouse mb m | m -> mb where
   -- | Sets the cursor mode for all subsequent computations. Note, that many
   -- | implementations require some sort of "poll" to read the IO
   setCursorMode :: CursorMode -> m ()
   -- | Returns true if the given mouse button is pressed
-  mbIsPressed :: mb -> m (Bool)
+  mbIsPressed :: mb -> m Bool
   -- | Resets the pressed state of the mouse button
   releaseButton :: mb -> m ()
   -- | Get the current cursor location
@@ -57,71 +74,127 @@ class (MouseButton mb, Monad m) => MonadMouse mb m | m -> mb where
   -- | Get the amount of scrolling done in the x and y directions
   scroll :: m (Double, Double)
 
+instance MonadMouse mb m => MonadMouse mb (StateT s m) where
+  setCursorMode = lift . setCursorMode
+  mbIsPressed = lift . mbIsPressed
+  releaseButton = lift . releaseButton
+  cursor = lift cursor
+  scroll = lift scroll
+
+instance MonadMouse mb m => MonadMouse mb (ReaderT r m) where
+  setCursorMode = lift . setCursorMode
+  mbIsPressed = lift . mbIsPressed
+  releaseButton = lift . releaseButton
+  cursor = lift cursor
+  scroll = lift scroll
+
+instance (Monoid w, MonadMouse mb m) => MonadMouse mb (WriterT w m) where
+  setCursorMode = lift . setCursorMode
+  mbIsPressed = lift . mbIsPressed
+  releaseButton = lift . releaseButton
+  cursor = lift cursor
+  scroll = lift scroll
+
+instance MonadMouse mb m => MonadMouse mb (ExceptT e m) where
+  setCursorMode = lift . setCursorMode
+  mbIsPressed = lift . mbIsPressed
+  releaseButton = lift . releaseButton
+  cursor = lift cursor
+  scroll = lift scroll
+
+instance MonadMouse mb m => MonadMouse mb (MaybeT m) where
+  setCursorMode = lift . setCursorMode
+  mbIsPressed = lift . mbIsPressed
+  releaseButton = lift . releaseButton
+  cursor = lift cursor
+  scroll = lift scroll
+
+instance MonadMouse mb m => MonadMouse mb (ListT m) where
+  setCursorMode = lift . setCursorMode
+  mbIsPressed = lift . mbIsPressed
+  releaseButton = lift . releaseButton
+  cursor = lift cursor
+  scroll = lift scroll
+
+instance MonadMouse mb m => MonadMouse mb (IdentityT m) where
+  setCursorMode = lift . setCursorMode
+  mbIsPressed = lift . mbIsPressed
+  releaseButton = lift . releaseButton
+  cursor = lift cursor
+  scroll = lift scroll
+
+instance MonadMouse mb m => MonadMouse mb (ContT r m) where
+  setCursorMode = lift . setCursorMode
+  mbIsPressed = lift . mbIsPressed
+  releaseButton = lift . releaseButton
+  cursor = lift cursor
+  scroll = lift scroll
+
 -- ** Mouse input wires
 
 -- | Ignores its input and returns
 -- the current normalized mouse coordinates. Regardless of window size,
 -- each of the returned coordinates will be in the range @[-1, 1]@.
--- 
+--
 -- * Depends: now
 -- * Inhibits: never
 mouseCursor :: MonadMouse mb m => Wire s e m a (Float, Float)
 mouseCursor = mkGen_ $ \_ -> liftM Right cursor
 
+--------------------------------------------------------------------------------
+
+-- | When the given mouse button is clicked (debounced).
+mousePressed :: (MonadMouse mb m, Monoid e)
+                   => mb -> Wire s e m a (Event a)
+-- We do it this way instead of using the old-in netwire-input 'mouseDebounced'
+-- because that achieves its function via 'releaseButton' which means that only
+-- one instance of a 'mouseDebounced' can be valid for each 'MouseButton',
+-- breaking all referential transparency. This way avoids that problem.
+mousePressed mb = idifyEvent (became id . isMousePressed mb)
+
+-- | When the mouse is released after being pressed.
+mouseReleased :: (MonadMouse mb m, Monoid e)
+                     => mb -> Wire s e m a (Event a)
+mouseReleased mb = idifyEvent (noLonger id . isMousePressed mb)
+
+-- | 'True' when the given mouse button is pressed, 'False' otherwise.
+--
+-- * Inhibits: never
+isMousePressed :: (MonadMouse mb m, Monoid e)
+                 => mb -> Wire s e m a Bool
+isMousePressed mb = mkGen_ (const (Right <$> mbIsPressed mb))
+
 -- | Returns the change in mouse coordinates between subsequent time instants
--- 
+--
 -- * Depends: before now
 -- * Inhibits: never
 mouseDelta :: (MonadFix m, MonadMouse mb m) => Wire s e m a (Float, Float)
 mouseDelta = let
   delta (x, y) (x', y') = (x - x', y - y')
   in
-   (mouseCursor >>>) $ loop $ second (delay (0, 0)) >>>
-   (arr $ \(cur, last) -> (delta cur last, cur))
+   (mouseCursor >>>) . loop $ second (delay (0, 0)) >>>
+   arr ( \(cur, lst) -> (delta cur lst, cur))
 
 -- | The mouse mickies are the offset from zero at each time instant. If this
 -- wire is being used, then it is assuming that the cursor mode is set to
 -- 'CursorMode'Reset'
--- 
+--
 -- * Depends: now
 -- * Inhibits: never
 mouseMickies :: MonadMouse mb m => Wire s e m a (Float, Float)
 mouseMickies =
-  (mkGen_ $ \a -> do { setCursorMode CursorMode'Reset; return (Right a) }) >>>
+  mkGen_ ( \a -> do { setCursorMode CursorMode'Reset; return (Right a) }) >>>
   mouseCursor
 
--- | Behaves like the identity wire when the mouse button is pressed
--- and inhibits otherwise
--- 
--- * Inhibits: when the mouse button is not pressed
-mousePressed :: (Monoid e, MonadMouse mb m) => mb -> Wire s e m a a
-mousePressed mouse = mkGen_ $ \x -> do
-  pressed <- mbIsPressed mouse
-  if pressed
-    then return (Right x)
-    else return (Left mempty)
-
--- | Behaves like the identity wire for a signle instant when the mouse button
--- is pressed and otherwise inhibits
--- 
--- * Depends: the instant at which the mouse button is pressed
--- * Inhibits: when the mouse button is not pressed or after it has been pressed
-mouseDebounced :: (Monoid e, MonadMouse mb m) => mb -> Wire s e m a a
-mouseDebounced mouse = mkGen_ $ \x -> do
-  pressed <- mbIsPressed mouse
-  if pressed
-    then releaseButton mouse >> return (Right x)
-    else return (Left mempty)
-
 -- | The mouse scroll is the offset from zero at each time instant.
--- 
+--
 -- * Depends: now
 -- * Inhibits: never
 mouseScroll :: (Monoid e, MonadMouse mb m) => Wire s e m a (Double, Double)
 mouseScroll = mkGen_ $ \_ -> liftM Right scroll
 
 -- | The amount that the mouse has scrolled over the course of the entire wire.
--- 
+--
 -- * Depends: now
 -- * Inhibits: never
 mouseScrolled :: (Monoid e, MonadMouse mb m) => Wire s e m a (Double, Double)
@@ -131,17 +204,12 @@ mouseScrolled = mouseScroll >>> fn (0, 0)
       let result = (x + dx, y + dy)
       in (result, fn result)
 
--- | Behaves like the identity wire, and inhibits immediately after
--- setting the cursor mode. Common uses of this wire are to switch it
--- to the identity wire:
--- @
---   cursorMode CursorMode'Disabled --> mkId
--- @
--- 
--- * Inhibits: after now
+-- | Behaves like the identity wire, but changes the cursor mode now.
+--
+-- * Inhibits: never
 cursorMode :: (MonadMouse mb m, Monoid e) => CursorMode -> Wire s e m a a
 cursorMode mode =
-  (mkGenN $ \x -> setCursorMode mode >> (return $ (Right x, mkEmpty)))
+  mkGenN ( \x -> setCursorMode mode >> return (Right x, mkId))
 
 --------------------------------------------------------------------------------
 -- * Keyboard input
@@ -150,44 +218,62 @@ cursorMode mode =
 -- | to provide keyboard input.
 class Key a
 
--- | This monad describes computations that involve keyboard input. 
+-- | This monad describes computations that involve keyboard input.
 class (Key k, Monad m) => MonadKeyboard k m | m -> k where
   -- | Returns true if the given key is currently pressed
-  keyIsPressed :: k -> m (Bool)
+  keyIsPressed :: k -> m Bool
   -- | Resets the pressed state of the given key.
   releaseKey :: k -> m ()
 
+instance MonadKeyboard k m => MonadKeyboard k (StateT s m) where
+  keyIsPressed = lift . keyIsPressed
+  releaseKey = lift . releaseKey
+
+instance MonadKeyboard k m => MonadKeyboard k (ReaderT r m) where
+  keyIsPressed = lift . keyIsPressed
+  releaseKey = lift . releaseKey
+
+instance (Monoid w, MonadKeyboard k m) => MonadKeyboard k (WriterT w m) where
+  keyIsPressed = lift . keyIsPressed
+  releaseKey = lift . releaseKey
+
+instance MonadKeyboard k m => MonadKeyboard k (ExceptT e m) where
+  keyIsPressed = lift . keyIsPressed
+  releaseKey = lift . releaseKey
+
+instance MonadKeyboard k m => MonadKeyboard k (MaybeT m) where
+  keyIsPressed = lift . keyIsPressed
+  releaseKey = lift . releaseKey
+
+instance MonadKeyboard k m => MonadKeyboard k (ListT m) where
+  keyIsPressed = lift . keyIsPressed
+  releaseKey = lift . releaseKey
+
+instance MonadKeyboard k m => MonadKeyboard k (IdentityT m) where
+  keyIsPressed = lift . keyIsPressed
+  releaseKey = lift . releaseKey
+
+instance MonadKeyboard k m => MonadKeyboard k (ContT r m) where
+  keyIsPressed = lift . keyIsPressed
+  releaseKey = lift . releaseKey
+
 -- * Keyboard input wires
 
--- | Behaves like the identity wire when the key is pressed
--- and inhibits otherwise
--- 
--- * Inhibits: when the key is not pressed
-keyPressed :: (Monoid e, MonadKeyboard k m) => k -> Wire s e m a a
-keyPressed key = mkGen_ $ \x -> do
-  pressed <- keyIsPressed key
-  if pressed
-    then return (Right x)
-    else return (Left mempty)
+--------------------------------------------------------------------------------
 
--- | Behaves like the identity wire when the key is not pressed
--- and inhibits otherwise
--- 
--- * Inhibits: when the key is pressed
-keyNotPressed :: (Monoid e, MonadKeyboard k m) => k -> Wire s e m a a
-keyNotPressed key = mkGen_ $ \x -> do
-  pressed <- keyIsPressed key
-  if pressed
-    then return (Left mempty)
-    else return (Right x)
+-- | When the given key is pressed (debounced).
+--
+-- * Inhibits: never
+keyPressed :: (MonadKeyboard k m, Monoid e)
+                 => k -> Wire s e m a (Event a)
+keyPressed k = idifyEvent (became id . isKeyPressed k)
 
--- | Behaves like the identity wire for a signle instant when the key
--- is pressed and otherwise inhibits
--- 
--- * Inhibits: when the key is not pressed or after it has been pressed
-keyDebounced :: (Monoid e, MonadKeyboard k m) => k -> Wire s e m a a
-keyDebounced key = mkGen_ $ \x -> do
-  pressed <- keyIsPressed key
-  if pressed
-    then releaseKey key >> return (Right x)
-    else return (Left mempty)
+-- | When the mouse is released after being pressed.
+keyReleased :: (MonadKeyboard k m, Monoid e)
+                     => k -> Wire s e m a (Event a)
+keyReleased k = idifyEvent (noLonger id . isKeyPressed k)
+
+-- | 'True' when the given key is pressed, 'False' otherwise.
+isKeyPressed :: (MonadKeyboard k m, Monoid e)
+              => k -> Wire s e m a Bool
+isKeyPressed k = mkGen_ (const (Right <$> keyIsPressed k))
