@@ -19,9 +19,10 @@ module FRP.Netwire.Input where
 
 --------------------------------------------------------------------------------
 -- Requried modules
+import Prelude hiding ((.), id)
 import Control.Monad (liftM)
 import Control.Monad.Fix
-import Control.Wire hiding ((.))
+import Control.Wire
 import Data.Monoid
 --------------------------------------------------------------------------------
 
@@ -101,6 +102,12 @@ mousePressed mouse = mkGen_ $ \x -> do
     then return (Right x)
     else return (Left mempty)
 
+-- | Ignores its input and returns True whenever the mouse button is pressed
+--
+-- * Inhibits: never
+isMousePressed :: (Monoid e, MonadMouse mb m) => mb -> Wire s e m a Bool
+isMousePressed b = mousePressed b . pure True <|> pure False
+
 -- | Behaves like the identity wire for a signle instant when the mouse button
 -- is pressed and otherwise inhibits
 -- 
@@ -169,6 +176,12 @@ keyPressed key = mkGen_ $ \x -> do
   if pressed
     then return (Right x)
     else return (Left mempty)
+
+-- | Ignores its input and returns True whenever the key is pressed
+--
+-- * Inhibits: never
+isKeyPressed :: (Monoid e, MonadKeyboard k m) => k -> Wire s e m a Bool
+isKeyPressed key = keyPressed key . pure True <|> pure False
 
 -- | Behaves like the identity wire when the key is not pressed
 -- and inhibits otherwise
