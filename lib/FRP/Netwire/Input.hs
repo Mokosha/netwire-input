@@ -23,7 +23,6 @@ import Prelude hiding ((.), id)
 import Control.Monad (liftM)
 import Control.Monad.Fix
 import Control.Wire
-import Data.Monoid
 --------------------------------------------------------------------------------
 
 --------------------------------------------------------------------------------
@@ -102,15 +101,16 @@ mousePressed mouse = mkGen_ $ \x -> do
     then return (Right x)
     else return (Left mempty)
 
--- | Ignores its input and returns True whenever the mouse button is pressed
+-- | Ignores its input and returns 'True' whenever the mouse button is pressed,
+-- 'False' otherwise.
 --
 -- * Inhibits: never
-isMousePressed :: (Monoid e, MonadMouse mb m) => mb -> Wire s e m a Bool
-isMousePressed b = mousePressed b . pure True <|> pure False
+isMousePressed :: MonadMouse mb m => mb -> Wire s e m a Bool
+isMousePressed = mkGen_ . const . fmap Right . mbIsPressed
 
 -- | Behaves like the identity wire for a signle instant when the mouse button
 -- is pressed and otherwise inhibits
--- 
+--
 -- * Depends: the instant at which the mouse button is pressed
 -- * Inhibits: when the mouse button is not pressed or after it has been pressed
 mouseDebounced :: (Monoid e, MonadMouse mb m) => mb -> Wire s e m a a
@@ -120,15 +120,29 @@ mouseDebounced mouse = mkGen_ $ \x -> do
     then releaseButton mouse >> return (Right x)
     else return (Left mempty)
 
+-- | Fires an event the instant the given mouse button is pressed after not
+-- being pressed.
+--
+-- * Inhibits: never
+mouseBecamePressed :: MonadMouse mb m => mb -> Wire s e m a (Event a)
+mouseBecamePressed mb = eventToId (became id . isMousePressed mb)
+
+-- | Fires an event the instant the given mouse button is released after being
+-- pressed.
+--
+-- * Inhibits: never
+mouseNoLongerPressed :: MonadMouse mb m => mb -> Wire s e m a (Event a)
+mouseNoLongerPressed mb = eventToId (noLonger id . isMousePressed mb)
+
 -- | The mouse scroll is the offset from zero at each time instant.
--- 
+--
 -- * Depends: now
 -- * Inhibits: never
 mouseScroll :: (Monoid e, MonadMouse mb m) => Wire s e m a (Double, Double)
 mouseScroll = mkGen_ $ \_ -> liftM Right scroll
 
 -- | The amount that the mouse has scrolled over the course of the entire wire.
--- 
+--
 -- * Depends: now
 -- * Inhibits: never
 mouseScrolled :: (Monoid e, MonadMouse mb m) => Wire s e m a (Double, Double)
@@ -144,7 +158,7 @@ mouseScrolled = mouseScroll >>> fn (0, 0)
 -- @
 --   cursorMode CursorMode'Disabled --> mkId
 -- @
--- 
+--
 -- * Inhibits: after now
 cursorMode :: (MonadMouse mb m, Monoid e) => CursorMode -> Wire s e m a a
 cursorMode mode =
@@ -168,7 +182,7 @@ class (Key k, Monad m) => MonadKeyboard k m | m -> k where
 
 -- | Behaves like the identity wire when the key is pressed
 -- and inhibits otherwise
--- 
+--
 -- * Inhibits: when the key is not pressed
 keyPressed :: (Monoid e, MonadKeyboard k m) => k -> Wire s e m a a
 keyPressed key = mkGen_ $ \x -> do
@@ -177,15 +191,9 @@ keyPressed key = mkGen_ $ \x -> do
     then return (Right x)
     else return (Left mempty)
 
--- | Ignores its input and returns True whenever the key is pressed
---
--- * Inhibits: never
-isKeyPressed :: (Monoid e, MonadKeyboard k m) => k -> Wire s e m a Bool
-isKeyPressed key = keyPressed key . pure True <|> pure False
-
 -- | Behaves like the identity wire when the key is not pressed
 -- and inhibits otherwise
--- 
+--
 -- * Inhibits: when the key is pressed
 keyNotPressed :: (Monoid e, MonadKeyboard k m) => k -> Wire s e m a a
 keyNotPressed key = mkGen_ $ \x -> do
@@ -194,9 +202,16 @@ keyNotPressed key = mkGen_ $ \x -> do
     then return (Left mempty)
     else return (Right x)
 
--- | Behaves like the identity wire for a signle instant when the key
+-- | Ignores its input and returns 'True' whenever the key is pressed, 'False'
+-- otherwise.
+--
+-- * Inhibits: never
+isKeyPressed :: MonadKeyboard k m => k -> Wire s e m a Bool
+isKeyPressed = mkGen_ . const . fmap Right . keyIsPressed
+
+-- | Behaves like the identity wire for a single instant when the key
 -- is pressed and otherwise inhibits
--- 
+--
 -- * Inhibits: when the key is not pressed or after it has been pressed
 keyDebounced :: (Monoid e, MonadKeyboard k m) => k -> Wire s e m a a
 keyDebounced key = mkGen_ $ \x -> do
@@ -204,3 +219,23 @@ keyDebounced key = mkGen_ $ \x -> do
   if pressed
     then releaseKey key >> return (Right x)
     else return (Left mempty)
+
+-- | Fires an event the instant the given key is pressed after not being pressed.
+--
+-- * Inhibits: never
+keyBecamePressed :: MonadKeyboard k m => k -> Wire s e m a (Event a)
+keyBecamePressed key = eventToId (became id . isKeyPressed key)
+
+-- | Fires an event the instant the given key is released after being pressed.
+--
+-- * Inhibits: never
+keyNoLongerPressed :: MonadKeyboard k m => k -> Wire s e m a (Event a)
+keyNoLongerPressed key = eventToId (noLonger id . isKeyPressed key)
+
+-- * Utility functions
+
+-- | Take an wire that produces an arbitrary event, and change the contents
+-- of those events to instead be the same as the input value at the time of
+-- the event's occurrence.
+eventToId :: Monad m => Wire s e m a (Event b) -> Wire s e m a (Event a)
+eventToId wire = uncurry (fmap . const) <$> (id &&& wire)
