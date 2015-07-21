@@ -2,7 +2,7 @@
 -- documentation, see http://haskell.org/cabal/users-guide/
 
 name:                netwire-input
-version:             0.0.4
+version:             0.0.5
 synopsis:            Input handling abstractions for netwire
 description:         This package contains a collection of Monad typeclasses that
                      support interaction with input devices such as keyboard and
@@ -30,7 +30,8 @@ library
   default-extensions:  FunctionalDependencies
                        MultiParamTypeClasses
   exposed-modules:     FRP.Netwire.Input
-  build-depends:       base >= 4.6 && < 4.10,
+  other-modules:       FRP.Netwire.Input.Util
+  build-depends:       base >= 4.6 && < 4.9,
                        netwire >= 5
   hs-source-dirs:      lib
   default-language:    Haskell2010
