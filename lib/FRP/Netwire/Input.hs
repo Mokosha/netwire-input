@@ -22,11 +22,14 @@ module FRP.Netwire.Input where
 --------------------------------------------------------------------------------
 -- Requried modules
 import Prelude hiding ((.), id)
+import Control.DeepSeq
 import Control.Monad (liftM)
 import Control.Monad.Fix
 import Control.Wire
 
 import FRP.Netwire.Input.Util
+
+import GHC.Generics
 --------------------------------------------------------------------------------
 
 --------------------------------------------------------------------------------
@@ -43,7 +46,9 @@ data CursorMode = CursorMode'Disabled -- ^ The mouse cursor is disabled
                 | CursorMode'Hidden   -- ^ The mouse cursor is hidden when over the application
                 | CursorMode'Enabled  -- ^ The mouse cursor is enabed and
                                       -- visible over the application
-                deriving (Ord, Enum, Eq, Show, Read)
+                deriving (Ord, Enum, Eq, Show, Read, Generic)
+
+instance NFData CursorMode
 
 -- ** Mouse input
 
