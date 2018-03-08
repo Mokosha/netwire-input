@@ -27,8 +27,6 @@ source-repository head
   location:       git@github.com:Mokosha/netwire-input.git
 
 library
-  default-extensions:  FunctionalDependencies
-                       MultiParamTypeClasses
   exposed-modules:     FRP.Netwire.Input
   other-modules:       FRP.Netwire.Input.Util
   build-depends:       base >= 4.6 && < 6,

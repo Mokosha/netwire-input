@@ -14,7 +14,9 @@ provides an instance of one of the underlying typeclasses 'MonadMouse' or
 as dependencies, these instances are provided in separate libraries.
 
 -}
-
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 module FRP.Netwire.Input where
 
 --------------------------------------------------------------------------------
