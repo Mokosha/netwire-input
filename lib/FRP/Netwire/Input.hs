@@ -1,7 +1,7 @@
 {-|
 Module      : FRP.Netwire.Input
 Description : Common wires to be used to support input in netwire
-Copyright   : (c) Pavel Krajcevski, 2014
+Copyright   : (c) Pavel Krajcevski, 2018
 License     : MIT
 Maintainer  : Krajcevski@gmail.com
 Stability   : experimental
