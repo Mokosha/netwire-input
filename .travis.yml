@@ -29,7 +29,7 @@ matrix:
   # We grab the appropriate GHC and cabal-install versions from hvr's PPA. See:
   # https://github.com/hvr/multi-ghc-travis
 
-  # We don't support 7.6 until netwire-input and netwire-input-glfw do...
+  # We don't support 7.6 or 7.8 until netwire uploads corrected build flags...
   - env: BUILD=cabal GHCVER=7.6.3 CABALVER=1.16
     compiler: ": # GHC 7.6.3"
     addons: {apt: {packages: [cabal-install-1.16, ghc-7.6.3], sources: [hvr-ghc]}}
@@ -39,6 +39,12 @@ matrix:
   - env: BUILD=cabal GHCVER=7.10.3 CABALVER=1.22
     compiler: ": #GHC 7.10.3"
     addons: {apt: {packages: [cabal-install-1.22,ghc-7.10.3], sources: [hvr-ghc]}}
+  - env: BUILD=cabal GHCVER=8.0.2 CABALVER=1.24
+    compiler: ": #GHC 8.0.2"
+    addons: {apt: {packages: [cabal-install-1.24,ghc-8.0.2], sources: [hvr-ghc]}}
+  - env: BUILD=cabal GHCVER=8.2.2 CABALVER=2.0
+    compiler: ": #GHC 8.2.2"
+    addons: {apt: {packages: [cabal-install-2.0,ghc-8.2.2], sources: [hvr-ghc]}}
 
   # Build with the newest GHC and cabal-install. This is an accepted failure,
   # see below.
@@ -48,6 +54,21 @@ matrix:
 
   # The Stack builds. We can pass in arbitrary Stack arguments via the ARGS
   # variable, such as using --stack-yaml to point to a different file.
+  - env: BUILD=stack ARGS="--resolver lts-9.21"
+    compiler: ": #stack 8.0.2 osx"
+    os: osx
+
+  - env: BUILD=stack ARGS="--resolver lts-9.21"
+    compiler: ": #stack 8.0.2 linux"
+    addons: {apt: {packages: [cabal-install-head, ghc-head], sources: [hvr-ghc]}}
+
+  - env: BUILD=stack ARGS="--resolver lts-11.1"
+    compiler: ": #stack 8.2.2 osx"
+    os: osx
+
+  - env: BUILD=stack ARGS="--resolver lts-11.1"
+    compiler: ": #stack 8.2.2 linux"
+    addons: {apt: {packages: [cabal-install-head, ghc-head], sources: [hvr-ghc]}}
 
   # Nightly builds are allowed to fail
   - env: BUILD=stack ARGS="--resolver nightly"
@@ -63,6 +84,7 @@ matrix:
   - env: BUILD=cabal GHCVER=7.6.3 CABALVER=1.16
   - env: BUILD=cabal GHCVER=7.8.4 CABALVER=1.18
   - env: BUILD=cabal GHCVER=head  CABALVER=head
+  - env: BUILD=stack ARGS="--resolver nightly"
 
 before_install:
 # Using compiler above sets CC to an invalid value, so unset it
